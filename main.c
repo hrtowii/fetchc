@@ -138,46 +138,6 @@ double get_used_ram(void) {
 	return (double)used_memory / (1024 * 1024);
 }
 
-uint32_t gLogoBitmap[32] = { 0x0, 0xa00, 0x400, 0x5540, 0x7fc0, 0x3f80, 0x3f80, 0x1f00, 0x1f00, 0x1f00, 0x3f80, 0xffe0, 0x3f80, 0x3f80, 0x3f83, 0x103f9f, 0x18103ffb, 0xe3fffd5, 0x1beabfab, 0x480d7fd5, 0xf80abfab, 0x480d7fd5, 0x1beabfab, 0xe3fffd5, 0x18107ffb, 0x107fdf, 0x7fc3, 0xffe0, 0xffe0, 0xffe0, 0x1fff0, 0x1fff0 };
-#define IMAGE_HEIGHT 32
-#define IMAGE_WIDTH 1
-int shrink_bitmap_to_8x8(uint32_t *src, uint32_t *dest) {
-    for (int y = 0; y < 8; y++) {
-        uint32_t row = 0;
-        for (int x = 0; x < 8; x++) {
-            uint32_t pixel = src[y * 32 + x];
-            row |= (pixel & 0x80000000) >> (31 - x);
-        }
-        dest[y] = row;
-    }
-	return 1;
-}
-void print_bitmap_array_hex(uint32_t *data, int height, int width) {
-    for (int y = 0; y < height; y++) {
-        for (int x = 0; x < width; x++) {
-            uint32_t pixel = data[y * width + x];
-            printf("0x%08X ", pixel);
-        }
-        printf("\n");
-    }
-}
-
-void draw_image(uint32_t *data) {
-    for (int y = 0; y < IMAGE_HEIGHT; y++) {
-        for (int x = 0; x < IMAGE_WIDTH; x++) {
-            uint32_t pixel = data[y * IMAGE_WIDTH + x];
-            for (int bit = 0; bit < 32; bit++) {
-                if ((pixel >> bit) & 1) {
-                    printf("█");
-                } else {
-                    printf(" ");
-                }
-            }
-        }
-        printf("\n"); // Move to the next line after each row
-    }
-}
-
 int main() {
 	info.col1 = BMAGENTA "            \n";
 	info.col2 = BMAGENTA "  \\\\  \\\\ //     ";
@@ -192,14 +152,14 @@ int main() {
 	time_t our_uptime = get_boot_time();
 	char* our_hostname = get_hostname();
 	char* our_macOS_vers = get_macOS();
-	printf("%s", info.col1);
-	printf("%s\n", info.col2);
-	printf("%s HOSTNAME  %s%s\n", info.col3, WHITE, our_hostname);
+	printf("%s", 										info.col1);
+	printf("%s\n", 										info.col2);
+	printf("%s HOSTNAME  %s%s\n", 						info.col3, WHITE, our_hostname);
 	print_uptime(our_uptime);
-	printf("%s macOS	   %s%s\n%s KERNEL    %s%s\n", info.col5, WHITE, our_macOS_vers, info.col6, WHITE, our_version);
+	printf("%s macOS	   %s%s\n%s KERNEL    %s%s\n", 	info.col5, WHITE, our_macOS_vers, info.col6, WHITE, our_version);
 	free(our_version);
-	printf("%s INSTALLED %s%d\n", info.col7, WHITE, get_installed_packages_brew());
-	printf("%s RAM	   %s%3.1f MiB / %3.1f MiB\n", info.col8, WHITE, get_used_ram(), get_total_ram());
+	printf("%s INSTALLED %s%d\n", 						info.col7, WHITE, get_installed_packages_brew());
+	printf("%s RAM	   %s%3.1f MiB / %3.1f MiB\n", 		info.col8, WHITE, get_used_ram(), get_total_ram());
 	// draw_image(gLogoBitmap);
 	return 0;
 }
