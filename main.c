@@ -53,12 +53,19 @@ void print_uptime(time_t uptime) { // i begged claude for this
 }
 
 char* get_version() {
-	char* our_version = malloc(256);
-    size_t size = 256;
-	if (sysctlbyname("kern.version", our_version, &size, NULL, 0) != 0) {
-		strcpy(our_version, "unknown");
-	};
-	return our_version;
+    char our_version[256];
+    size_t size = sizeof(our_version);
+    if (sysctlbyname("kern.version", our_version, &size, NULL, 0) != 0) {
+        char* unknown_version = strdup("unknown");
+        return unknown_version;
+    } else {
+        char* colon = strchr(our_version, ':');
+        if (colon != NULL) {
+            *colon = '\0';
+        }
+        char* version_copy = strdup(our_version);
+        return version_copy;
+    }
 }
 
 char* get_macOS() { // asked claude dot ai for this.
@@ -78,7 +85,7 @@ char* get_macOS() { // asked claude dot ai for this.
 }
 
 char* get_hostname() {
-	char hostname[1024];
+	static char hostname[1024];
 	hostname[1023] = '\0';
 	gethostname(hostname, 1023);
 	return hostname;
@@ -157,7 +164,6 @@ int main() {
 	printf("%s HOSTNAME  %s%s\n", 						info.col3, WHITE, our_hostname);
 	print_uptime(our_uptime);
 	printf("%s macOS	   %s%s\n%s KERNEL    %s%s\n", 	info.col5, WHITE, our_macOS_vers, info.col6, WHITE, our_version);
-	free(our_version);
 	printf("%s INSTALLED %s%d\n", 						info.col7, WHITE, get_installed_packages_brew());
 	printf("%s RAM	   %s%3.1f MiB / %3.1f MiB\n", 		info.col8, WHITE, get_used_ram(), get_total_ram());
 	// draw_image(gLogoBitmap);
