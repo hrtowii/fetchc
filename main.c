@@ -14,6 +14,79 @@
 #include <mach/mach_host.h>
 // color
 #include "color.h"
+//battery info
+#include <CoreFoundation/CoreFoundation.h>
+#include <IOKit/IOKitLib.h>
+#include <IOKit/ps/IOPowerSources.h>
+#include <IOKit/ps/IOPSKeys.h>
+
+// static void printDictionaryEntry(const void *key, const void *value, void *context) {
+//     if (CFGetTypeID(key) == CFStringGetTypeID() && CFGetTypeID(value) == CFNumberGetTypeID()) {
+//         char buffer[256];
+//         CFStringGetCString((CFStringRef)key, buffer, sizeof(buffer), kCFStringEncodingUTF8);
+//         int intValue;
+//         CFNumberGetValue((CFNumberRef)value, kCFNumberIntType, &intValue);
+//         printf("%s: %d\n", buffer, intValue);
+//     } else if (CFGetTypeID(key) == CFStringGetTypeID() && CFGetTypeID(value) == CFBooleanGetTypeID()) {
+//         char buffer[256];
+//         CFStringGetCString((CFStringRef)key, buffer, sizeof(buffer), kCFStringEncodingUTF8);
+//         bool boolValue = CFBooleanGetValue((CFBooleanRef)value);
+//         printf("%s: %s\n", buffer, boolValue ? "true" : "false");
+//     } else if (CFGetTypeID(key) == CFStringGetTypeID() && CFGetTypeID(value) == CFStringGetTypeID()) {
+//         char keyBuffer[256];
+//         char valueBuffer[256];
+//         CFStringGetCString((CFStringRef)key, keyBuffer, sizeof(keyBuffer), kCFStringEncodingUTF8);
+//         CFStringGetCString((CFStringRef)value, valueBuffer, sizeof(valueBuffer), kCFStringEncodingUTF8);
+//         printf("%s: %s\n", keyBuffer, valueBuffer);
+//     }
+// }
+
+int get_cycle_count() {
+    io_service_t powerSource = IOServiceGetMatchingService(kIOMasterPortDefault, IOServiceMatching("IOPMPowerSource"));
+    CFMutableDictionaryRef batteryProperties = NULL;
+    IORegistryEntryCreateCFProperties(powerSource, &batteryProperties, NULL, 0);
+    // printf("Battery Properties:\n");
+    // CFDictionaryApplyFunction(batteryProperties, printDictionaryEntry, NULL);
+    int cycleCount = -1;
+    CFNumberRef cycleCountValue = (CFNumberRef)CFDictionaryGetValue(batteryProperties, CFSTR("CycleCount"));
+    if (cycleCountValue != NULL) {
+        CFNumberGetValue(cycleCountValue, kCFNumberIntType, &cycleCount);
+    }
+    if (batteryProperties != NULL) {
+        CFRelease(batteryProperties);
+    }
+    IOObjectRelease(powerSource);
+    return cycleCount;
+}
+
+int get_battery_percentage() {
+    CFTypeRef powerSourceInfo = IOPSCopyPowerSourcesInfo();
+    CFArrayRef powerSources = IOPSCopyPowerSourcesList(powerSourceInfo);
+    CFDictionaryRef powerSource = NULL;
+
+    if (CFArrayGetCount(powerSources) > 0) {
+        powerSource = (CFDictionaryRef)CFArrayGetValueAtIndex(powerSources, 0);
+        // Current Capacity
+        CFNumberRef currentCapacity = (CFNumberRef)CFDictionaryGetValue(powerSource, CFSTR(kIOPSCurrentCapacityKey));
+        if (currentCapacity) {
+            int current;
+            CFNumberGetValue(currentCapacity, kCFNumberIntType, &current);
+            printf("Current Capacity: %d\n", current);
+        }
+
+        // Maximum Capacity
+        CFNumberRef maxCapacity = (CFNumberRef)CFDictionaryGetValue(powerSource, CFSTR(kIOPSMaxCapacityKey));
+        if (maxCapacity) {
+            int max;
+            CFNumberGetValue(maxCapacity, kCFNumberIntType, &max);
+            printf("Maximum Capacity: %d\n", max);
+        }
+    }
+
+    CFRelease(powerSourceInfo);
+    CFRelease(powerSources);
+    return -1;
+}
 
 struct dist {
 	char *col1, *col2, *col3, *col4, *col5, *col6, *col7, *col8;
@@ -40,7 +113,7 @@ time_t get_boot_time() {
     return tv.tv_sec;
 }
 
-void print_uptime(time_t uptime) { // i begged claude for this
+void print_uptime(time_t uptime) {
     time_t now = time(NULL);
     time_t boot_time = now - uptime;
     struct tm* boot_tm = gmtime(&boot_time);
@@ -56,32 +129,49 @@ char* get_version() {
     char our_version[256];
     size_t size = sizeof(our_version);
     if (sysctlbyname("kern.version", our_version, &size, NULL, 0) != 0) {
-        char* unknown_version = strdup("unknown");
-        return unknown_version;
+        return strdup("unknown");
     } else {
         char* colon = strchr(our_version, ':');
         if (colon != NULL) {
             *colon = '\0';
         }
-        char* version_copy = strdup(our_version);
-        return version_copy;
+        return strdup(our_version);
     }
 }
 
-char* get_macOS() { // asked claude dot ai for this.
-    char buffer[128];
-    FILE* pipe = popen("sw_vers -productVersion", "r");
-    if (!pipe) {
+char* get_macOS() {
+    char osversion[32];
+    size_t osversion_len = sizeof(osversion);
+    int osversion_name[] = { CTL_KERN, KERN_OSRELEASE };
+
+    if (sysctl(osversion_name, 2, osversion, &osversion_len, NULL, 0) == -1) {
+        fprintf(stderr, "sysctl() failed\n");
         return NULL;
     }
-    char* version = fgets(buffer, sizeof(buffer), pipe);
-    pclose(pipe);
-    if (version) {
-        version[strcspn(version, "\n")] = '\0';
-        return strdup(version);
+
+    osversion[osversion_len] = '\0'; // Null-terminate the string
+
+    uint32_t major, minor;
+    if (sscanf(osversion, "%u.%u", &major, &minor) != 2) {
+        fprintf(stderr, "sscanf() failed\n");
+        return NULL;
+    }
+
+    int intversion = (int)major;
+    if (major >= 20) {
+        intversion -= 9;
     } else {
+        intversion -= 4;
+    }
+
+    char* version_string = malloc(16 * sizeof(char));
+    if (version_string == NULL) {
+        fprintf(stderr, "Failed to allocate memory\n");
         return NULL;
     }
+
+    snprintf(version_string, 16, "%d.%u", intversion, minor);
+    return version_string;
 }
 
 char* get_hostname() {
@@ -146,27 +236,28 @@ double get_used_ram(void) {
 }
 
 int main() {
-	info.col1 = BMAGENTA "            \n";
-	info.col2 = BMAGENTA "  \\\\  \\\\ //     ";
-	info.col3 = BMAGENTA " ==\\\\__\\\\/ //   ";
-	info.col4 = BMAGENTA "   //   \\\\//    ";
-	info.col5 = BMAGENTA "==//     //==   ";
-	info.col6 = BMAGENTA " //\\\\___//      ";
-	info.col7 = BMAGENTA "// /\\\\  \\\\==    ";
-	info.col8 = BMAGENTA "  // \\\\  \\\\     ";
-
+    info.col1 = "" BYELLOW;
+	info.col2 = BGREEN "        .:'     " BMAGENTA;
+	info.col3 = BGREEN "    __ :'__     " BMAGENTA;
+	info.col4 = BYELLOW " .'`__`-'__``.  " BMAGENTA;
+	info.col5 = BRED ":__________.-'  " BMAGENTA;
+	info.col6 = BRED ":_________:     " BMAGENTA;
+	info.col7 = BMAGENTA " :_________`-;  " BMAGENTA;
+	info.col8 = BBLUE "  `.__.-.__.'   " BMAGENTA;
 	char* our_version = get_version();
 	time_t our_uptime = get_boot_time();
 	char* our_hostname = get_hostname();
 	char* our_macOS_vers = get_macOS();
 	printf("%s", 										info.col1);
-	printf("%s\n", 										info.col2);
+	printf("%s CYCLES    %s%d\n", 						info.col2, WHITE, get_cycle_count());
 	printf("%s HOSTNAME  %s%s\n", 						info.col3, WHITE, our_hostname);
 	print_uptime(our_uptime);
 	printf("%s macOS	   %s%s\n%s KERNEL    %s%s\n", 	info.col5, WHITE, our_macOS_vers, info.col6, WHITE, our_version);
 	printf("%s INSTALLED %s%d\n", 						info.col7, WHITE, get_installed_packages_brew());
 	printf("%s RAM	   %s%3.1f MiB / %3.1f MiB\n", 		info.col8, WHITE, get_used_ram(), get_total_ram());
 	// draw_image(gLogoBitmap);
+    free(our_macOS_vers);
+    free(our_version);
 	return 0;
 }
 
