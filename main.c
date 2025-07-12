@@ -118,7 +118,7 @@ void print_uptime(time_t uptime) {
     time_t boot_time = now - uptime;
     struct tm* boot_tm = gmtime(&boot_time);
 
-    printf("%s UPTIME    %s", info.col4, WHITE);
+    printf("%s uptime    %s", info.col3, WHITE);
     if (boot_tm->tm_year != 70) {
         printf("%d years, ", boot_tm->tm_year + 1900);
     }
@@ -237,24 +237,24 @@ double get_used_ram(void) {
 
 int main() {
     info.col1 = "" BYELLOW;
-	info.col2 = BGREEN "        .:'     " BMAGENTA;
-	info.col3 = BGREEN "    __ :'__     " BMAGENTA;
-	info.col4 = BYELLOW " .'`__`-'__``.  " BMAGENTA;
-	info.col5 = BRED ":__________.-'  " BMAGENTA;
-	info.col6 = BRED ":_________:     " BMAGENTA;
-	info.col7 = BMAGENTA " :_________`-;  " BMAGENTA;
-	info.col8 = BBLUE "  `.__.-.__.'   " BMAGENTA;
+	info.col2 = BGREEN "        .:'     " BRED;
+	info.col3 = BGREEN "    __ :'__     " BRED;
+	info.col4 = BYELLOW " .'`__`-'__``.  " BRED;
+	info.col5 = BRED ":__________.-'  " BRED;
+	info.col6 = BRED ":_________:     " BRED;
+	info.col7 = BMAGENTA " :_________`-;  " BRED;
+	info.col8 = BBLUE "  `.__.-.__.'   " BRED;
 	char* our_version = get_version();
 	time_t our_uptime = get_boot_time();
 	char* our_hostname = get_hostname();
 	char* our_macOS_vers = get_macOS();
 	printf("%s", 										info.col1);
-	printf("%s CYCLES    %s%d\n", 						info.col2, WHITE, get_cycle_count());
-	printf("%s HOSTNAME  %s%s\n", 						info.col3, WHITE, our_hostname);
+	printf("%s host      %s%s\n", 						info.col2, WHITE, our_hostname);
 	print_uptime(our_uptime);
-	printf("%s macOS	   %s%s\n%s KERNEL    %s%s\n", 	info.col5, WHITE, our_macOS_vers, info.col6, WHITE, our_version);
-	printf("%s INSTALLED %s%d\n", 						info.col7, WHITE, get_installed_packages_brew());
-	printf("%s RAM	   %s%3.1f MiB / %3.1f MiB\n", 		info.col8, WHITE, get_used_ram(), get_total_ram());
+	printf("%s macOS	   %s%s\n%s kernel    %s%s\n", 	info.col4, WHITE, our_macOS_vers, info.col5, WHITE, our_version);
+	printf("%s installed %s%d\n", 						info.col6, WHITE, get_installed_packages_brew());
+	printf("%s ram	   %s%3.0fM / %3.0fM\n", 		info.col7, WHITE, get_used_ram(), get_total_ram());
+    printf("%s cycles    %s%d\n", 						info.col8, WHITE, get_cycle_count());
 	// draw_image(gLogoBitmap);
     free(our_macOS_vers);
     free(our_version);
